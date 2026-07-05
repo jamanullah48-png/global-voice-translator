@@ -1,79 +1,80 @@
-# Global Voice AI Translator — Flutter Skeleton
+# Global Voice AI Translator — Starter Scaffold
 
-A working, functional starting point for the app described in the spec.
-This covers the **Volume 1 (System Architecture)** and the mobile-facing
-slice of Volume 4 (AI Engine), using only free/on-device APIs — no keys
-required to run it.
+A real, runnable starting point for the app described in the spec: Flutter
+mobile client + Node.js/Express backend with WebSocket streaming, wired for
+Whisper / NLLB-200 / SeamlessM4T / GPT / Coqui XTTS integration.
 
-## What actually works right now
+This is a **scaffold**, not the finished 150-language, call/meeting-translating,
+voice-cloning product — it gives you working auth, a working translate flow
+end-to-end (stubbed AI providers), a WebSocket gateway for live conversation
+mode, and a Postgres schema to build on. Every AI integration point is clearly
+marked so you (or an AI coding assistant) can drop in real API calls.
 
-| Feature | Implementation | Cost |
-|---|---|---|
-| Text translation | [LibreTranslate](https://libretranslate.com) public API | Free |
-| Speech-to-text | `speech_to_text` (on-device OS engine) | Free |
-| Text-to-speech | `flutter_tts` (on-device OS engine) | Free |
-| Camera OCR | Google ML Kit Text Recognition (on-device) | Free |
-| Live Conversation Mode | Two-pane UI built on the same STT/TTS/translate pipeline | Free |
-| History & Favorites | Local persistence via `shared_preferences` | Free |
-| Onboarding, theming, navigation | Material 3 + `go_router` | — |
-
-Things marked "Premium" in the spec (offline packs, voice cloning, call/
-meeting translation, Stripe/Apple Pay/Google Pay checkout) are stubbed as
-UI only — they need paid infrastructure (server, billing account) that
-can't be wired up without your credentials.
-
-## Architecture
+## Structure
 
 ```
-lib/
-  core/
-    constants/     # API endpoints, storage keys, fallback language list
-    router/         # go_router route table
-    theme/          # Material 3 theme
-  data/
-    models/         # LanguageModel, TranslationEntry
-    services/       # TranslationService, SpeechService, StorageService
-  providers/         # Riverpod state (languages, history, translate flow)
-  presentation/
-    screens/         # One file per screen
-    widgets/         # Shared widgets (language picker, mic button)
+backend/     Node.js + Express + WebSocket API
+mobile/      Flutter app (Riverpod, Material 3, clean architecture)
+database/    PostgreSQL starter schema
 ```
 
-This is intentionally provider-agnostic: `TranslationService` is an
-abstract interface. `LibreTranslateService` implements it today. Swapping
-in Google Translate, DeepL, or an OpenAI-based translator later means
-writing one new class and changing one line in `providers/app_providers.dart`
-— nothing in the UI changes.
-
-## Running it
+## Backend quickstart
 
 ```bash
-flutter pub get
-flutter run
+cd backend
+cp .env.example .env      # fill in API keys as you get them
+npm install
+npm run dev                # starts on http://localhost:4000
 ```
 
-You'll need a device/emulator with microphone and camera for the voice and
-camera features to do anything (they degrade gracefully with a permission
-message if denied).
+Or with Docker (spins up Postgres, Mongo, Redis too):
 
-## Known limitations of this skeleton
+```bash
+cd backend/docker
+docker compose up --build
+```
 
-- **LibreTranslate's public instance is rate-limited and sometimes slow.**
-  For real use, self-host it (Docker image on the LibreTranslate GitHub) or
-  swap in a paid provider once you have API keys.
-- **No backend yet.** History/favorites are local-only; there's no login,
-  no cloud sync, no admin dashboard. That's Volumes 2, 3, and 5 of the
-  original spec — separate builds.
-- **No voice cloning, call translation, or meeting translation.** These
-  need either paid APIs (ElevenLabs, Twilio, Zoom/Meet SDKs) or your own
-  infrastructure.
-- **Not yet tested against a live Flutter SDK in this environment** (no
-  network/Flutter toolchain available here) — review `pubspec.yaml`
-  versions against the latest stable Flutter before running.
+Health check: `GET http://localhost:4000/api/v1/health`
 
-## Suggested next build
+### What's real vs. stubbed
 
-Given the full spec is 9 volumes, the next highest-leverage piece is
-usually the **backend** (Volume 2): auth, a real translation-history API,
-and a place for the admin dashboard to read from. Happy to build that
-next if useful.
+| Area | Status |
+|---|---|
+| Express app, routing, middleware, error handling | ✅ Fully working |
+| JWT auth (register/login/guest) | ✅ Working (in-memory store — swap for Postgres) |
+| Rate limiting, helmet, CORS | ✅ Working |
+| WebSocket gateway (rooms, live translation streaming) | ✅ Working plumbing |
+| Whisper / NLLB-200 / SeamlessM4T / Coqui XTTS / GPT calls | 🔧 Stubbed — clearly marked integration points |
+| Postgres schema | ✅ Core tables (users, subscriptions, history, AI usage, devices, errors) |
+| Firebase Admin (push, OAuth verification) | 🔧 Stubbed — needs service account credentials |
+| Stripe / Apple Pay / Google Pay | 🔧 Not yet wired (recommend RevenueCat to unify all three) |
+
+## Mobile quickstart
+
+```bash
+cd mobile
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://localhost:4000/api/v1 \
+            --dart-define=WS_URL=ws://localhost:4000/ws
+```
+
+### What's real vs. stubbed
+
+| Area | Status |
+|---|---|
+| App shell, Material 3 theme (light/dark), routing | ✅ Working |
+| Riverpod state management structure | ✅ Working |
+| Text translation screen wired to backend | ✅ Working end-to-end (against stub responses) |
+| Login screen (Google/Apple/Facebook/Email/Guest) | 🔧 UI built, provider SDK calls not wired |
+| Voice, camera OCR, conversation mode, call/meeting translation | 🔧 Not built yet — natural next screens to add |
+| Offline packs, favorites/history persistence (Hive) | 🔧 Dependencies included, not implemented |
+
+## Suggested next steps
+
+1. Stand up a self-hosted NLLB-200 + Coqui XTTS inference server (or start
+   with DeepL/Google Translate + ElevenLabs while you validate the product).
+2. Replace the in-memory user store with real Postgres queries.
+3. Wire Firebase Auth in the Flutter app and exchange ID tokens via `/auth/oauth`.
+4. Build out voice recording (`record` package) → `/translate/voice` flow.
+5. Add camera OCR screen using `google_mlkit_text_recognition`.
+6. Layer RevenueCat for premium entitlements (cleanest way to unify Stripe/Apple Pay/Google Pay).
